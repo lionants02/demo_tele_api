@@ -1,0 +1,213 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "demo vdo api",
+        "version": "0.0.1",
+        "description": "สำหรับรสร้างห้องประชุม VDO CONFERENCE ใช้งานบนเว็บ </br>การใช้งาน ต้องทำการ **สร้าง Link ประชุม** แล้วจะได้ **joinLink** สำหรับเรียกเข้าห้อง โดยที่ผู้ที่อยู้ห้องเดียวกันจะต้องมี Link **t=xxx** เดียวกัน โดยเมื่อหมดเวลาการใช้งาน ระบบจะตัดการเชื่อมต่อการเข้าห้องอัตโนมัติ</br>ไม่สามารถเปิดด้วย LINE internal web browser หรือ Facebook internal web browser ได้ เพราะติดสิทธิ์การเรียกใช้งานไมค์และกล้อง</br><img src=\"assets/preview.gif\" style=\"display:block;margin-left:auto;margin-right:auto;\">"
+    },
+    "servers": [
+        {
+            "url": "https://tele2-api.hii.in.th"
+        }
+    ],
+    "security": [
+        {
+            "api-key": []
+        }
+    ],
+    "components": {
+        "securitySchemes": {
+            "api-key": {
+                "type": "apiKey",
+                "name": "api-key",
+                "in": "header",
+                "description": "api-key สำหรับใช้งาน api"
+            },
+            "api-external-access-code": {
+                "type": "apiKey",
+                "name": "api-external-access-code",
+                "in": "header",
+                "description": "api-external-access-code สำหรับใช้งาน api V2"
+            }
+        },
+        "schemas": {
+            "joinQueueRequest": {
+                "type": "object",
+                "description": "ข้อมูลสำหรับขอสร้างห้อง vdo conference",
+                "properties": {
+                    "queue_code": {
+                        "type": "string",
+                        "description": "รหัส queue_code ต้องไม่ซ้ำกัน ถ้าซ้ำกันจะเป็นการ update ข้อมูลเดิม",
+                        "example": "sddfe453q"
+                    },
+                    "start_time": {
+                        "type": "string",
+                        "description": "เวลาเริ่มใช้ห้อง vdo",
+                        "example": "2022-12-27T15:08:51.716579500"
+                    },
+                    "end_time": {
+                        "type": "string",
+                        "description": "เวลาจบห้องประชุม",
+                        "example": "2023-01-10T22:08:51.718584300"
+                    }
+                }
+            },
+            "joinQueueResponse": {
+                "type": "object",
+                "properties": {
+                    "property": {
+                        "$ref": "#/components/schemas/joinQueueRequest"
+                    },
+                    "createAt": {
+                        "type": "string",
+                        "description": "เวลาที่ create object",
+                        "example": "2022-12-27T15:16:11.866697600"
+                    },
+                    "updateAt": {
+                        "type": "string",
+                        "description": "เวลาที่ update object",
+                        "example": "2022-12-27T15:16:11.866697600"
+                    },
+                    "joinLink": {
+                        "type": "string",
+                        "description": "Link สำหรับเข้าห้องประชุม",
+                        "example": "https://examle.hii.in.th/con/?t=tt0008&name=x"
+                    }
+                }
+            }
+        }
+    },
+    "paths": {
+        "/join/queue": {
+            "post": {
+                "tags": [
+                    "Create Service"
+                ],
+                "description": "ขอสร้าง Link สำหรับใช้งานห้องประชุม",
+                "summary": "สร้าง Link ประชุม",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/joinQueueRequest"
+                            }
+                        }
+                    },
+                    "required": true,
+                    "description": "ข้อมูลที่ใช้สรำหรับการสร้างห้องประชุม"
+                },
+                "responses": {
+                    "201": {
+                        "description": "ข้อมูลที่ใช้สำหรับเข้าห้องประชุม",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/joinQueueResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "รหัส queue_code อาจจะซ้ำ ดูจาก message"
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                }
+            },
+            "get": {
+                "tags": [
+                    "Create Service"
+                ],
+                "description": "ดูข้อมูลห้องประชุม ที่เคยสร้างไว้",
+                "summary": "ดูข้อมูลห้องประชุม",
+                "parameters": [
+                    {
+                        "name": "queue_code",
+                        "in": "query",
+                        "description": "รหัส queue_code ที่เคยสร้างไว้",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "sddfe453q"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ข้อมูลการสร้างห้องประชุม",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/joinQueueResponse"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    },
+                    "404": {
+                        "description": "ไม่พบข้อมูล"
+                    }
+                }
+            }
+        },
+        "/join/queue/{queue_code}": {
+            "put": {
+                "tags": [
+                    "Create Service"
+                ],
+                "summary": "อัพเดทข้อมูล queue_code",
+                "description": "อัพเดทข้อมูล queue_code โดยที่รหัส queue_code กับใน json body รหัส queue_code ต้องตรงกัน และ ไม่สามารถ update ย้อนหลังห้องที่ จบไปแล้ว(เลยเวลา end_time)",
+                "parameters": [
+                    {
+                        "name": "queue_code",
+                        "in": "path",
+                        "description": "รหัส queue_code ที่เคยสร้างไว้",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "sddfe453q"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/joinQueueRequest"
+                            }
+                        }
+                    },
+                    "required": true,
+                    "description": "ข้อมูลที่ใช้สรำหรับการสร้างห้องประชุม"
+                },
+                "responses": {
+                    "201": {
+                        "description": "ข้อมูลที่ใช้สำหรับเข้าห้องประชุม",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/joinQueueResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Error อาจเป็นไปได้ว่า ข้อมูล queue_code ใน body ที่ส่งมาอัพเดทไม่ตรง กับที่อ้างอิงให้แก้ไข"
+                    },
+                    "404": {
+                        "description": "ไม่พบ queue_code"
+                    },
+                    "500": {
+                        "description": "Server Error "
+                    }
+                }
+            }
+        }
+    }
+}
