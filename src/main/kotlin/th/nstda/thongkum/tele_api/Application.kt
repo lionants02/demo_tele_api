@@ -226,7 +226,7 @@ val config: Config
 fun main(args: Array<String>) {
     privateConfig = ConfigWithParameter(args)
     val log = getLogger(Unit::class.java)
-    log.info("vidu url ${config.openviduDefaultUrl} ${config.openviduDefaultSecret}")
+    log.info("vidu url ${config.openviduDefaultUrl} ${config.openviduDefaultSecret} Timezone ${config.apiTimeZone}")
     embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
         .start(wait = true)
 }

@@ -212,13 +212,10 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import th.nstda.thongkum.tele_api.config
 import th.nstda.thongkum.tele_api.db.HikariCPConnection
-import th.nstda.thongkum.tele_api.services.conference.join.Util.Companion.convertDataToData2
 import th.nstda.thongkum.tele_api.services.conference.vdo.VdoServerController
-import java.util.UUID
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
+
 
 class JoinController : HikariCPConnection() {
     /**
@@ -274,37 +271,6 @@ class JoinController : HikariCPConnection() {
         CREATE_NEW_OBJECT
     }
 
-    fun postV2(join: JoinQueue2Data): Pair<JoinQueue2Response, CreateStatus> {
-        require(join.queue_code.trim().isNotEmpty()) { "queue_code is empty" }
-        require(join.reserve_date.isNotEmpty()) { "reserve_date is empty" }
-        require(join.reserve_time.isNotEmpty()) { "reserve_time is empty" }
-        require(UUID.fromString(join.queue_code) != null) { "${join.queue_code} convert to UUID Error" }
-        require(join.duration > 0) { "duration is ${join.duration} > 0" }
-        return try {
-            get(join.queue_code.trim()).let {
-                JoinQueue2Response(
-                    convertDataToData2(it.property),
-                    it.createAt,
-                    it.updateAt,
-                    it.joinLink
-                ) to CreateStatus.FOUND_OLD_OBJECT
-            }
-        } catch (ex: Exception) {
-            val instant = "${join.reserve_date}T${join.reserve_time}.000Z".toInstant()
-            val startTime = instant.toLocalDateTime(TimeZone.UTC)
-            val endTime = instant.plus(join.duration.toDuration(DurationUnit.MINUTES)).toLocalDateTime(TimeZone.UTC)
-            val createJoin = JoinQueueData(join.queue_code.trim(), startTime, endTime)
-            val result = post(createJoin)
-            JoinQueue2Response(
-                convertDataToData2(result.property),
-                result.createAt,
-                result.updateAt,
-                result.joinLink
-            ) to CreateStatus.CREATE_NEW_OBJECT
-        }
-    }
-
-
     /**
      * ข้อมูลสำหรับการจองใช้ vdo conference
      */
@@ -318,7 +284,7 @@ class JoinController : HikariCPConnection() {
         }
 
         val vdoServer = VdoServerController.instant.getServer()
-        val createLinkJoin = "${config.frontEnd}?t=${join.queue_code.trim()}&name=x"
+        val createLinkJoin = "${config.frontEnd}?api=${config.apiDomain}&t=${join.queue_code.trim()}&name=x"
         try {
             transaction {
                 SchemaUtils.create(JoinQueueExpose)

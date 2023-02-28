@@ -205,6 +205,7 @@
 
 package th.nstda.thongkum.tele_api.config
 
+import kotlinx.datetime.TimeZone
 import org.kohsuke.args4j.CmdLineException
 import org.kohsuke.args4j.CmdLineParser
 import org.kohsuke.args4j.Option
@@ -226,10 +227,21 @@ class ConfigWithParameter(args: Array<String>) : Config {
 
     @Option(name = "-api_key", usage = "-api_key")
     private var _apiKey = ""
-    
+
+    @Option(name = "-api_url", usage = "-api_url https://api-example.hii.in.th")
+    private var _apiUrl = ""
+
     @Option(name = "-enter_early_sec", usage = "-enter_early_sec <sec>")
     private var _enterEarlySec = ""
 
+    @Option(name = "-enter_after_sec", usage = "-enter_after_sec <sec>")
+    private var _enterAfterSec = ""
+
+    @Option(name = "-prefix_session", usage = "-prefix_session <prefix>")
+    private var _prefixVideoSession = ""
+
+    @Option(name = "-api_tz", usage = "-api_tz <time zone id ex. Asia/Bangkok>")
+    private var _apiTimeZone = ""
 
     override val openviduDefaultUrl: String
         get() = _openviduDefaultUrl.ifBlank { "VIDU_DEFAULT_URL".systemEnv }
@@ -247,8 +259,17 @@ class ConfigWithParameter(args: Array<String>) : Config {
 
     override val apiKey: String
         get() = _apiKey.ifBlank { "API_KEY".systemEnv }.ifBlank { "bBIFF5zkWq2oleJTVV1OviKCvSFkSCrguHGB" }
-    override val enterEarlySec: Int
-        get() = (_enterEarlySec.ifBlank { "EARLY_SEC".systemEnv }.ifBlank { "300" }).toInt()
+
+    override val apiDomain: String
+        get() = _apiUrl.ifBlank { "API_URL".systemEnv }.ifBlank { "http://localhost:8080" }
+    override val enterEarlySec: Long
+        get() = (_enterEarlySec.ifBlank { "EARLY_SEC".systemEnv }.ifBlank { "300" }).toLong()
+    override val enterAfterSec: Long
+        get() = (_enterAfterSec.ifBlank { "AFTER_SEC".systemEnv }.ifBlank { "300" }).toLong()
+    override val prefixVdoSession: String
+        get() = _prefixVideoSession.ifBlank { "PREFIX_SESSION".systemEnv }.ifBlank { "demo" }
+    override val apiTimeZone: String
+        get() = _apiTimeZone.ifBlank { "TIME_ZONE_ID".systemEnv }.ifBlank { TimeZone.UTC.id }
     private val String.systemEnv: String
         get() = System.getenv(this) ?: ""
 

@@ -215,6 +215,7 @@ import io.ktor.server.plugins.forwardedheaders.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import kotlinx.serialization.Serializable
+import th.nstda.thongkum.tele_api.getLogger
 
 fun Application.configureHTTP() {
     install(CachingHeaders) {
@@ -270,10 +271,13 @@ fun Application.configureHTTP() {
                     ExceptionResponse(cause.message ?: "", HttpStatusCode.NotFound.value)
                 )
 
-                else -> call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ExceptionResponse("Error 500", HttpStatusCode.InternalServerError.value)
-                )
+                else -> {
+                    getLogger(this::class.java).error(cause.message ?: "Error", cause)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        ExceptionResponse("Error 500", HttpStatusCode.InternalServerError.value)
+                    )
+                }
             }
         }
     }

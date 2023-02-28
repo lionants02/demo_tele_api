@@ -214,5 +214,14 @@ interface Config {
     val hikariConfigFile: String
     val frontEnd: String
     val apiKey: String
-    val enterEarlySec: Int
+    val apiDomain: String
+    val enterEarlySec: Long
+    val enterAfterSec: Long
+    val prefixVdoSession: String
+
+    /**
+     * https://gist.github.com/arpit/1035596
+     * https://github.com/Kotlin/kotlinx-datetime/blob/master/core/native/cinterop/public/windows_zones.hpp
+     */
+    val apiTimeZone: String
 }

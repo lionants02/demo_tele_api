@@ -214,18 +214,56 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import th.nstda.thongkum.tele_api.activity_log.ActivityLog.ACTIVITY.*
 import th.nstda.thongkum.tele_api.activity_log.ActivityLog.ActivityHttpHeader
 import th.nstda.thongkum.tele_api.activity_log.ActivityLogController
 import th.nstda.thongkum.tele_api.config
 import th.nstda.thongkum.tele_api.getLogger
 import th.nstda.thongkum.tele_api.services.conference.join.JoinController
-import th.nstda.thongkum.tele_api.services.conference.join.JoinController.CreateStatus.CREATE_NEW_OBJECT
-import th.nstda.thongkum.tele_api.services.conference.join.JoinController.CreateStatus.FOUND_OLD_OBJECT
-import th.nstda.thongkum.tele_api.services.conference.join.JoinQueue2Data
 import th.nstda.thongkum.tele_api.services.conference.join.JoinQueueData
+import th.nstda.thongkum.tele_api.services.conference.join.JoinQueueResponse
 import th.nstda.thongkum.tele_api.services.conference.vdo.VdoServerController
 import th.nstda.thongkum.tele_api.services.cron.CronTaskController
+
+private fun LocalDateTime.toProcessTimeZone(): LocalDateTime {
+    return this.toInstant(TimeZone.of(config.apiTimeZone)).toLocalDateTime(TimeZone.UTC)
+}
+
+private fun LocalDateTime.toApiReturnTimeZone(): LocalDateTime {
+    return this.toInstant(TimeZone.UTC).toLocalDateTime(TimeZone.of(config.apiTimeZone))
+}
+
+private fun JoinQueueData.toProcessTimeZone(): JoinQueueData {
+    return JoinQueueData(
+        queue_code,
+        start_time.toProcessTimeZone(),
+        end_time.toProcessTimeZone()
+    )
+}
+
+private fun JoinQueueData.toApiReturnTimeZone(): JoinQueueData {
+    return JoinQueueData(
+        queue_code,
+        start_time.toApiReturnTimeZone(),
+        end_time.toApiReturnTimeZone()
+    )
+}
+
+/**
+ * ตอนส่งข้อมูลกลับ ปรับโซนเวลาให้เหมือนเดิม
+ */
+private fun JoinQueueResponse.toApiReturnTimeZone(): JoinQueueResponse {
+    return JoinQueueResponse(
+        this.property.toApiReturnTimeZone(),
+        this.createAt.toApiReturnTimeZone(),
+        this.updateAt.toApiReturnTimeZone(),
+        this.joinLink
+    )
+}
 
 fun Application.configureVdoRouting() {
 
@@ -235,7 +273,7 @@ fun Application.configureVdoRouting() {
          */
         post("/join/queue") {
             require(call.request.header("api-key") == config.apiKey) { "API KEY Not cCC" }
-            val joinQueue = call.receive<JoinQueueData>()
+            val joinQueue = call.receive<JoinQueueData>().toProcessTimeZone()
             val create = JoinController.instant.post(joinQueue)
             runBlocking {
                 launch {
@@ -245,47 +283,16 @@ fun Application.configureVdoRouting() {
                 }
                 launch {
                     call.caching = CachingOptions(CacheControl.NoCache(null))
-                    call.respond(HttpStatusCode.Created, create)
+                    call.respond(HttpStatusCode.Created, create.toApiReturnTimeZone())
                 }
             }
         }
 
-        post("/join/queuev2") {
-            require(call.request.header("api-external-access-code") == config.apiKey) { "API KEY Not cCC" }
-            val joinQueue = call.receive<JoinQueue2Data>()
-            val (create, status) = JoinController.instant.postV2(joinQueue)
-            runBlocking {
-                launch {
-                    val result = create.property
-                    when (status) {
-                        FOUND_OLD_OBJECT -> {
-                            ActivityLogController.instant.logQueue(
-                                result.queue_code, WARNING, getHeaderLog(call)
-                            ) {
-                                "Duplicate queue_code can't create new return with old object. " +
-                                        "Old body start:${result.reserve_date}T${result.reserve_time}.000 duration:${result.duration}. " +
-                                        "New body start:${joinQueue.reserve_date}T${joinQueue.reserve_time}.000 duration:${joinQueue.duration}"
-                            }
-                        }
-
-                        CREATE_NEW_OBJECT -> {
-                            ActivityLogController.instant.logQueue(
-                                result.queue_code, CREATE, getHeaderLog(call)
-                            ) { "start:${result.reserve_date}T${result.reserve_time}.000 duration:${result.duration}" }
-                        }
-                    }
-                }
-                launch {
-                    call.caching = CachingOptions(CacheControl.NoCache(null))
-                    call.respond(HttpStatusCode.Created, create)
-                }
-            }
-        }
         put("/join/queue/{queue_code}") {
             require(call.request.header("api-key") == config.apiKey) { "API KEY Not cCC" }
             val queueCode = call.parameters["queue_code"]
             require(!queueCode.isNullOrBlank()) { "ข้อมูล queue_code มีค่าว่าง" }
-            val joinQueue = call.receive<JoinQueueData>()
+            val joinQueue = call.receive<JoinQueueData>().toProcessTimeZone()
             val update = JoinController.instant.update(queueCode, joinQueue)
             runBlocking {
                 launch {
@@ -295,7 +302,7 @@ fun Application.configureVdoRouting() {
                 }
                 launch {
                     call.caching = CachingOptions(CacheControl.NoCache(null))
-                    call.respond(HttpStatusCode.Created, update)
+                    call.respond(HttpStatusCode.Created, update.toApiReturnTimeZone())
                 }
             }
         }
@@ -304,7 +311,7 @@ fun Application.configureVdoRouting() {
             val queueCode = call.request.queryParameters["queue_code"]
             require(!queueCode.isNullOrBlank()) { "ข้อมูล queue_code มีค่าว่าง" }
             call.caching = CachingOptions(CacheControl.MaxAge(maxAgeSeconds = 300))
-            call.respond(JoinController.instant.get(queueCode))
+            call.respond(JoinController.instant.get(queueCode).toApiReturnTimeZone())
         }
 
         get("/cron") {
@@ -319,15 +326,15 @@ fun Application.configureVdoRouting() {
             val queueCode = call.parameters["queue_code"]
             require(!queueCode.isNullOrBlank()) { "ข้อมูล queue_code มีค่าว่าง" }
             call.caching = CachingOptions(CacheControl.MaxAge(maxAgeSeconds = 300))
-            call.respond(JoinController.instant.get(queueCode))
+            call.respond(JoinController.instant.get(queueCode).toApiReturnTimeZone())
         }
         get("/join/queue_input_test") {
             call.caching = CachingOptions(CacheControl.MaxAge(maxAgeSeconds = 3000))
-            call.respond(JoinController.instant.getTest())
+            call.respond(JoinController.instant.getTest().toApiReturnTimeZone())
         }
         get("/join/queue_response_test") {
             call.caching = CachingOptions(CacheControl.MaxAge(maxAgeSeconds = 3000))
-            call.respond(JoinController.instant.getResponseTest())
+            call.respond(JoinController.instant.getResponseTest().toApiReturnTimeZone())
         }
         /**
          * Vdo

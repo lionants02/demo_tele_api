@@ -213,8 +213,8 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class JoinQueueResponse(
-    val property: JoinQueueData,
-    val createAt: LocalDateTime,
-    val updateAt: LocalDateTime,
+    var property: JoinQueueData,
+    var createAt: LocalDateTime,
+    var updateAt: LocalDateTime,
     var joinLink: String
 )

@@ -208,11 +208,9 @@ package th.nstda.thongkum.tele_api.services.conference.vdo
 import io.openvidu.java.client.OpenVidu
 import io.openvidu.java.client.RecordingMode
 import io.openvidu.java.client.SessionProperties
-import kotlinx.datetime.Clock
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.*
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import th.nstda.thongkum.tele_api.config
@@ -222,13 +220,17 @@ import th.nstda.thongkum.tele_api.services.conference.join.JoinController
 import th.nstda.thongkum.tele_api.services.conference.join.JoinQueueSystemResponse
 import th.nstda.thongkum.tele_api.services.conference.vdo.vidu.ViduRest
 import th.nstda.thongkum.tele_api.services.conference.vdo.vidu.ViduSecret
-import kotlin.time.DurationUnit.SECONDS
-import kotlin.time.toDuration
+import kotlin.time.Duration.Companion.seconds
 
 class VdoServerController : HikariCPConnection() {
 
     fun getServer(): VdoServerData {
-        return Util.rndServerWithWeight(getServers())
+        return try {
+            Util.rndServerWithWeight(getServers())
+        } catch (ex: IndexOutOfBoundsException) {
+            setConfig(VdoServerData(config.openviduDefaultUrl, config.openviduDefaultSecret, 1))
+            Util.rndServerWithWeight(getServers())
+        }
     }
 
     fun getServers(): List<VdoServerData> {
@@ -240,31 +242,43 @@ class VdoServerController : HikariCPConnection() {
         }.toList()
     }
 
+    fun setConfig(config: VdoServerData) {
+        transaction {
+            SchemaUtils.create(VdoServerExpose)
+            VdoServerExpose.insert {
+                it[api] = config.api
+                it[secret] = config.secret
+                it[weight] = config.weight
+            }
+        }
+    }
+
     /**
      * สร้างห้องประชุม vdo
      */
     fun creteSession(sessionName: String) {
-        val check: JoinQueueSystemResponse = JoinController.instant.getSystemDetail(sessionName.trim())
-        creteSession(sessionName.trim(), check)
+        val configVdoSession: JoinQueueSystemResponse = JoinController.instant.getSystemDetail(sessionName.trim())
+        creteSession(sessionName.trim(), configVdoSession)
     }
 
-    fun creteSession(sessionName: String, check: JoinQueueSystemResponse) {
+    private fun creteSession(sessionName: String, configVdoSession: JoinQueueSystemResponse) {
+        val sessionPrefix = config.prefixVdoSession.trim() + sessionName.trim()
         val now = Clock.System.now()
-            .plus(config.enterEarlySec.toDuration(SECONDS)) // เข้าก่อนเวลากี่วิ
+//            .plus(config.enterEarlySec.toDuration(SECONDS)) // เข้าก่อนเวลากี่วิ
             .toLocalDateTime(TimeZone.UTC)
-        require(checkTime(check, now)) { "อยู่ขอบเขตนอกเวลาที่สร้างห้อง out of datetime" }
+        require(checkTime(configVdoSession, now)) { "อยู่ขอบเขตนอกเวลาที่สร้างห้อง out of datetime" }
 
-        val myVidu = ViduRest(ViduSecret(check.apiVdo, check.secretVdo))
-        if (myVidu.haveSession(sessionName.trim())) {
-            log.warn("มี session $sessionName อยู่ในระบบแล้ว have session $sessionName in system")
+        val myVidu = ViduRest(ViduSecret(configVdoSession.apiVdo, configVdoSession.secretVdo))
+        if (myVidu.haveSession(sessionPrefix)) {
+            log.warn("มี session $sessionPrefix อยู่ในระบบแล้ว have session $sessionPrefix in system")
             return
         }
 
         val properties: SessionProperties = SessionProperties.Builder()
-            .customSessionId(sessionName.trim())
+            .customSessionId(sessionPrefix)
             .recordingMode(RecordingMode.MANUAL)
             .build()
-        val vidu = OpenVidu(check.apiVdo, check.secretVdo)
+        val vidu = OpenVidu(configVdoSession.apiVdo, configVdoSession.secretVdo)
         val session = vidu.createSession(properties)
 
         log.info("Create session ${session.sessionId} create at ${session.createdAt()}")
@@ -274,18 +288,22 @@ class VdoServerController : HikariCPConnection() {
         val check = JoinController.instant.getSystemDetail(sessionName.trim())
         creteSession(sessionName.trim(), check)
         val myVidu = ViduRest(ViduSecret(check.apiVdo, check.secretVdo))
-        return myVidu.getConnection(sessionName.trim(), "x")
+        return myVidu.getPublisherConnection(sessionName.trim(), "x")
     }
 
     /**
      * สามารถสร้างห้องตามช่วงเวลาได้ไหม
      */
-    private fun checkTime(check: JoinQueueSystemResponse, now: LocalDateTime): Boolean {
-        if (now > check.property.end_time)
-            return false
-        if (now < check.property.start_time)
-            return false
-        return true
+    private fun checkTime(configVdoSession: JoinQueueSystemResponse, now: LocalDateTime): Boolean {
+        val endTimeLate = configVdoSession.property.end_time
+            .toInstant(TimeZone.UTC)
+            .plus(config.enterAfterSec.seconds)
+            .toLocalDateTime(TimeZone.UTC)
+        val startTimeEarly = configVdoSession.property.start_time
+            .toInstant(TimeZone.UTC)
+            .minus(config.enterEarlySec.seconds)
+            .toLocalDateTime(TimeZone.UTC)
+        return now < endTimeLate && now > startTimeEarly
     }
 
     companion object {

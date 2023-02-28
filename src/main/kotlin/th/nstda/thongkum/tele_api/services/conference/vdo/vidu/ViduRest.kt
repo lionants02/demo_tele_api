@@ -216,6 +216,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import th.nstda.thongkum.tele_api.config
 import th.nstda.thongkum.tele_api.getLogger
 
 class ViduRest(private val viduSecret: ViduSecret) : Vidu {
@@ -238,17 +239,18 @@ class ViduRest(private val viduSecret: ViduSecret) : Vidu {
         }
     }
 
-    override fun getConnection(sessionName: String, name: String): String {
+    override fun getPublisherConnection(sessionName: String, name: String): String {
         return runBlocking {
 
             val kurentoOptions = KurentoOptions(250, 100, 250, 100)
             // val data ="{\"clientData\":\"Participant73\"}"
             val requestConnection = RequestConnection("WEBRTC", null, false, "PUBLISHER", kurentoOptions)
-            val response = httpClient.post("${viduSecret.apiLink}/sessions/$sessionName/connection") {
-                basicAuth("OPENVIDUAPP", viduSecret.secretVdo)
-                setBody(requestConnection)
-                contentType(ContentType.Application.Json)
-            }
+            val response =
+                httpClient.post("${viduSecret.apiLink}/sessions/${config.prefixVdoSession}${sessionName}/connection") {
+                    basicAuth("OPENVIDUAPP", viduSecret.secretVdo)
+                    setBody(requestConnection)
+                    contentType(ContentType.Application.Json)
+                }
             require(response.status.isSuccess()) { "Cannot success ${response.status}" }
             val responseData: ReturnConnection = response.body()
             responseData.token!!
@@ -269,25 +271,17 @@ class ViduRest(private val viduSecret: ViduSecret) : Vidu {
 
     @Serializable
     internal data class SessionProperty(
-        val numberOfElements: Int,
-        val content: Array<Session>
+        val numberOfElements: Int, val content: Array<Session>
     )
 
     @Serializable
     internal data class Session(
-        val id: String,
-        val sessionId: String,
-        val `object`: String,
-        val createdAt: Long
+        val id: String, val sessionId: String, val `object`: String, val createdAt: Long
     )
 
     @Serializable
     internal data class RequestConnection(
-        val type: String,
-        val data: String?,
-        val record: Boolean,
-        val role: String,
-        val kurentoOptions: KurentoOptions
+        val type: String, val data: String?, val record: Boolean, val role: String, val kurentoOptions: KurentoOptions
     )
 
     @Serializable
