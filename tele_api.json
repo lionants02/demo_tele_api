@@ -40,12 +40,12 @@
                     "start_time": {
                         "type": "string",
                         "description": "เวลาเริ่มใช้ห้อง vdo",
-                        "example": "2022-12-27T15:08:51.716579500"
+                        "example": "2023-02-26T15:08:51.716579500"
                     },
                     "end_time": {
                         "type": "string",
                         "description": "เวลาจบห้องประชุม",
-                        "example": "2023-01-10T22:08:51.718584300"
+                        "example": "2023-03-10T22:08:51.718584300"
                     }
                 }
             },
@@ -58,12 +58,12 @@
                     "createAt": {
                         "type": "string",
                         "description": "เวลาที่ create object",
-                        "example": "2022-12-27T15:16:11.866697600"
+                        "example": "2023-02-26T15:08:51.716579500"
                     },
                     "updateAt": {
                         "type": "string",
                         "description": "เวลาที่ update object",
-                        "example": "2022-12-27T15:16:11.866697600"
+                        "example": "2023-02-26T15:08:51.716579500"
                     },
                     "joinLink": {
                         "type": "string",
